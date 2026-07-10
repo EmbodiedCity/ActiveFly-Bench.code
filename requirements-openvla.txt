@@ -1,0 +1,28 @@
+# Combined environment for Air-EQA + FLUC-OpenVLA server/client/metrics
+openai>=1.0.0
+google-genai>=1.0.0
+dashscope>=1.20.0
+pillow
+numpy==1.24.4
+scipy==1.10.1
+opencv-python==4.8.1.78
+contourpy==1.0.7
+msgpack-rpc-python==0.4.1
+msgpack-python==0.5.6
+tornado==4.5.3
+future==1.0.0
+airsim==1.8.1
+gym==0.10.9
+unrealcv>=1.1.5
+wget
+simple_pid
+pynput
+docker
+modelscope
+matplotlib
+protobuf==4.25.3
+tensorflow-metadata==1.15.0
+packaging
+ninja
+-e ./FLUC-OpenVLA/run
+-e ./FLUC-OpenVLA/eval

@@ -1,0 +1,33 @@
+# Python/cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Local envs and secrets
+.env
+.venv/
+venv/
+.idea/
+
+# Generated outputs
+cache/
+wandb/
+task_output/
+*.egg-info/
+*.wandb
+
+# Data/model artifacts
+datasets/
+hf-weights/
+*.ckpt
+*.pt
+*.pth
+*.safetensors
+*.bin
+*.zip
+*.tar
+*.tar.gz
+
+/eval/
+/scripts
