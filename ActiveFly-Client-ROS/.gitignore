@@ -1,0 +1,36 @@
+# Catkin build products
+build/
+devel/
+install/
+log/
+.catkin_tools/
+
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+pi05_ros/
+
+# Runtime/debug artifacts
+*.bag
+*.raw
+*.log
+run_log.txt
+*_history.jsonl
+step_*.json
+step_*.png
+queue_*.json
+received_images/
+vla_client_runs/
+
+# Local editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Temporary local backups
+*.bak
+*.bak_*
+* copy.py

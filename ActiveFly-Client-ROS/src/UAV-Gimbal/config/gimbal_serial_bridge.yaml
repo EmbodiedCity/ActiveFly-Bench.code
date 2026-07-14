@@ -1,0 +1,14 @@
+serial_path: "/dev/ttyUSB0"
+debug_tx_packets: false
+debug_rx_packets: false
+locked_roll_deg: 0.0
+locked_pitch_deg: 0.0
+locked_yaw_deg: 90.0
+pitch_ctrl_min_deg: -90.0
+pitch_ctrl_max_deg: 40.0
+yaw_wk_mode: 0
+fpv_follow_sens: 15
+rx_first_timeout_ms: 4
+io_sleep_ms: 5
+check_mount_mode: true
+expected_inv_flag: 0

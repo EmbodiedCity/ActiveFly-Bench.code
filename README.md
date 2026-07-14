@@ -322,6 +322,9 @@ python pipeline_web.py --static
 
 Debug mode reads trajectory frames from your configured dataset directories and model answers from `eval/api_results/`, then displays them as GIFs in the page. Run mode lets you execute the pipeline on one item from the browser; after the job finishes, open that item's detail page to view the updated videos and model answers.
 
+## 5. Real-world Deployment
+We provide the sample deployment code for real UAVs in ActiveFly-Client-ROS. Note that this repository only includes the VLA client code. The UAV flight control and path planning modules are not included. Please refer to here for more details.
+
 ## 6. Acknowledgement
 We sincerely thank the following projects for their excellent work: [UAV-Flow](https://prince687028.github.io/UAV-Flow/), [OpenVLA](https://github.com/openvla/openvla), [OpenPi](https://github.com/Physical-Intelligence/openpi).
 

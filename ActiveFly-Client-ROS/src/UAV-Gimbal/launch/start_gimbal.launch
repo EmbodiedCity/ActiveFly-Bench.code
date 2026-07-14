@@ -1,0 +1,65 @@
+<launch>
+	<!-- Serial bridge args -->
+	<arg name="serial_node_name" default="gimbal_ctrl" />
+	<arg name="serial_path" default="/dev/ttyUSB0" />
+	<arg name="debug_tx_packets" default="false" />
+	<arg name="debug_rx_packets" default="false" />
+	<arg name="locked_roll_deg" default="4.0" />
+	<arg name="locked_pitch_deg" default="0.0" />
+	<arg name="locked_yaw_deg" default="90.0" />
+	<arg name="pitch_ctrl_min_deg" default="-90.0" />
+	<arg name="pitch_ctrl_max_deg" default="40.0" />
+	<arg name="yaw_wk_mode" default="0" />
+	<arg name="fpv_follow_sens" default="15" />
+	<arg name="rx_first_timeout_ms" default="4" />
+	<arg name="io_sleep_ms" default="1" />
+	<arg name="check_mount_mode" default="true" />
+	<arg name="expected_inv_flag" default="0" />
+
+	<!-- Camera args -->
+	<arg name="camera_node_name" default="gimbal_camera" />
+	<arg name="camera_device" default="/dev/v4l/by-id/usb-BC-251027-ZW_MF500_camera_01.00.00-video-index0" />
+	<arg name="camera_width" default="1920" />
+	<arg name="camera_height" default="1080" />
+	<arg name="camera_fps" default="30.0" />
+	<arg name="camera_pixel_format" default="MJPG" />
+	<arg name="camera_frame_id" default="gimbal_camera_optical" />
+	<arg name="camera_name" default="mf500_gimbal" />
+	<arg name="camera_info_url" default="" />
+	<arg name="publish_compat_topic" default="false" />
+	<arg name="compat_topic_name" default="/cd_output_img_topic" />
+	<arg name="reconnect_interval_sec" default="1.0" />
+
+	<include file="$(find gimbal)/launch/gimbal_serial_bridge.launch">
+		<arg name="node_name" value="$(arg serial_node_name)" />
+		<arg name="serial_path" value="$(arg serial_path)" />
+		<arg name="debug_tx_packets" value="$(arg debug_tx_packets)" />
+		<arg name="debug_rx_packets" value="$(arg debug_rx_packets)" />
+		<arg name="locked_roll_deg" value="$(arg locked_roll_deg)" />
+		<arg name="locked_pitch_deg" value="$(arg locked_pitch_deg)" />
+		<arg name="locked_yaw_deg" value="$(arg locked_yaw_deg)" />
+		<arg name="pitch_ctrl_min_deg" value="$(arg pitch_ctrl_min_deg)" />
+		<arg name="pitch_ctrl_max_deg" value="$(arg pitch_ctrl_max_deg)" />
+		<arg name="yaw_wk_mode" value="$(arg yaw_wk_mode)" />
+		<arg name="fpv_follow_sens" value="$(arg fpv_follow_sens)" />
+		<arg name="rx_first_timeout_ms" value="$(arg rx_first_timeout_ms)" />
+		<arg name="io_sleep_ms" value="$(arg io_sleep_ms)" />
+		<arg name="check_mount_mode" value="$(arg check_mount_mode)" />
+		<arg name="expected_inv_flag" value="$(arg expected_inv_flag)" />
+	</include>
+
+	<include file="$(find gimbal)/launch/gimbal_camera.launch">
+		<arg name="node_name" value="$(arg camera_node_name)" />
+		<arg name="device" value="$(arg camera_device)" />
+		<arg name="width" value="$(arg camera_width)" />
+		<arg name="height" value="$(arg camera_height)" />
+		<arg name="fps" value="$(arg camera_fps)" />
+		<arg name="pixel_format" value="$(arg camera_pixel_format)" />
+		<arg name="frame_id" value="$(arg camera_frame_id)" />
+		<arg name="camera_name" value="$(arg camera_name)" />
+		<arg name="camera_info_url" value="$(arg camera_info_url)" />
+		<arg name="publish_compat_topic" value="$(arg publish_compat_topic)" />
+		<arg name="compat_topic_name" value="$(arg compat_topic_name)" />
+		<arg name="reconnect_interval_sec" value="$(arg reconnect_interval_sec)" />
+	</include>
+</launch>

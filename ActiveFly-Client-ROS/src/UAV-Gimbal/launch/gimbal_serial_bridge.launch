@@ -1,0 +1,36 @@
+<launch>
+  <arg name="node_name" default="gimbal_ctrl" />
+  <arg name="serial_path" default="/dev/ttyUSB0" />
+  <arg name="debug_tx_packets" default="false" />
+  <arg name="debug_rx_packets" default="false" />
+  <arg name="locked_roll_deg" default="0.0" />
+  <arg name="locked_pitch_deg" default="0.0" />
+  <arg name="locked_yaw_deg" default="90.0" />
+  <arg name="pitch_ctrl_min_deg" default="-90.0" />
+  <arg name="pitch_ctrl_max_deg" default="40.0" />
+  <arg name="yaw_wk_mode" default="0" />
+  <arg name="fpv_follow_sens" default="15" />
+  <arg name="rx_first_timeout_ms" default="4" />
+  <arg name="io_sleep_ms" default="1" />
+  <arg name="check_mount_mode" default="true" />
+  <arg name="expected_inv_flag" default="0" />
+
+  <rosparam command="load" file="$(find gimbal)/config/gimbal_serial_bridge.yaml" ns="$(arg node_name)" />
+
+  <node pkg="gimbal" type="gimbal_ctrl" name="$(arg node_name)" output="screen">
+    <param name="serial_path" type="str" value="$(arg serial_path)" />
+    <param name="debug_tx_packets" type="bool" value="$(arg debug_tx_packets)" />
+    <param name="debug_rx_packets" type="bool" value="$(arg debug_rx_packets)" />
+    <param name="locked_roll_deg" type="double" value="$(arg locked_roll_deg)" />
+    <param name="locked_pitch_deg" type="double" value="$(arg locked_pitch_deg)" />
+    <param name="locked_yaw_deg" type="double" value="$(arg locked_yaw_deg)" />
+    <param name="pitch_ctrl_min_deg" type="double" value="$(arg pitch_ctrl_min_deg)" />
+    <param name="pitch_ctrl_max_deg" type="double" value="$(arg pitch_ctrl_max_deg)" />
+    <param name="yaw_wk_mode" type="int" value="$(arg yaw_wk_mode)" />
+    <param name="fpv_follow_sens" type="int" value="$(arg fpv_follow_sens)" />
+    <param name="rx_first_timeout_ms" type="int" value="$(arg rx_first_timeout_ms)" />
+    <param name="io_sleep_ms" type="int" value="$(arg io_sleep_ms)" />
+    <param name="check_mount_mode" type="bool" value="$(arg check_mount_mode)" />
+    <param name="expected_inv_flag" type="int" value="$(arg expected_inv_flag)" />
+  </node>
+</launch>

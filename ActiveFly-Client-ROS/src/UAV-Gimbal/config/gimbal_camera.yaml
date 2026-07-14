@@ -1,0 +1,11 @@
+device: "/dev/v4l/by-id/usb-BC-251027-ZW_MF500_camera_01.00.00-video-index0"
+width: 1920
+height: 1080
+fps: 30.0
+pixel_format: "MJPG"
+frame_id: "gimbal_camera_optical"
+camera_name: "mf500_gimbal"
+camera_info_url: ""
+publish_compat_topic: false
+compat_topic_name: "/cd_output_img_topic"
+reconnect_interval_sec: 1.0

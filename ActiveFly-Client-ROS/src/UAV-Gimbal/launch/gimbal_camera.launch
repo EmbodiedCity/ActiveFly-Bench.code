@@ -1,0 +1,30 @@
+<launch>
+  <arg name="node_name" default="gimbal_camera" />
+  <arg name="device" default="/dev/v4l/by-id/usb-BC-251027-ZW_MF500_camera_01.00.00-video-index0" />
+  <arg name="width" default="1920" />
+  <arg name="height" default="1080" />
+  <arg name="fps" default="30.0" />
+  <arg name="pixel_format" default="MJPG" />
+  <arg name="frame_id" default="gimbal_camera_optical" />
+  <arg name="camera_name" default="mf500_gimbal" />
+  <arg name="camera_info_url" default="" />
+  <arg name="publish_compat_topic" default="false" />
+  <arg name="compat_topic_name" default="/cd_output_img_topic" />
+  <arg name="reconnect_interval_sec" default="1.0" />
+
+  <rosparam command="load" file="$(find gimbal)/config/gimbal_camera.yaml" ns="$(arg node_name)" />
+
+  <node pkg="gimbal" type="gimbal_camera_node" name="$(arg node_name)" output="screen">
+    <param name="device" type="str" value="$(arg device)" />
+    <param name="width" type="int" value="$(arg width)" />
+    <param name="height" type="int" value="$(arg height)" />
+    <param name="fps" type="double" value="$(arg fps)" />
+    <param name="pixel_format" type="str" value="$(arg pixel_format)" />
+    <param name="frame_id" type="str" value="$(arg frame_id)" />
+    <param name="camera_name" type="str" value="$(arg camera_name)" />
+    <param name="camera_info_url" type="str" value="$(arg camera_info_url)" />
+    <param name="publish_compat_topic" type="bool" value="$(arg publish_compat_topic)" />
+    <param name="compat_topic_name" type="str" value="$(arg compat_topic_name)" />
+    <param name="reconnect_interval_sec" type="double" value="$(arg reconnect_interval_sec)" />
+  </node>
+</launch>
