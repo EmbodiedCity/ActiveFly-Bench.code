@@ -8,9 +8,9 @@
 - [x] Simulation Deployment Released
   - [x] OpenVLA-based Agent
   - [x] OpenPi-based Agent
-- [ ] Real-world Deployment Released
-  - [ ] OpenVLA-based Agent
-  - [ ] OpenPi-based Agent
+- [x] Real-world Deployment Released
+  - [x] OpenVLA-based Agent
+  - [x] OpenPi-based Agent
 
 ## 1. Environment Setup
 ### OpenVLA-based Agent
