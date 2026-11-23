@@ -426,7 +426,7 @@ def control_loop_vla(
     frame_dir: str,
     frame_sleep: float,
     trajectory_log: List[Dict[str, Any]],
-) -> None:
+) -> bool:
     os.makedirs(frame_dir, exist_ok=True)
     # local frame: x, y, z, yaw (deg), pitch (deg) relative to the first frame
     current_pose = [0.0, 0.0, 0.0, 0.0, 0.0]
@@ -449,13 +449,14 @@ def control_loop_vla(
         )
         if response is None:
             logger.warning("No valid response, ending control loop.")
-            break
+            return False
 
         action_poses = response.get("action")
         if not isinstance(action_poses, list) or len(action_poses) == 0:
             logger.warning("Response 'action' is empty or invalid, stopping.")
-            break
+            return False
 
+        initial_step_count = step_count
         for i, action_pose in enumerate(action_poses):
             if not (isinstance(action_pose, (list, tuple)) and len(action_pose) >= 5):
                 logger.warning(f"Invalid action element at {i}: {action_pose}")
@@ -512,15 +513,19 @@ def control_loop_vla(
                     small_count = 0
                 if small_count >= ACTION_SMALL_STEPS:
                     logger.info(f"Detected small change for {ACTION_SMALL_STEPS} steps, ending task.")
-                    return
+                    return True
             last_pose = current_pose
 
             if step_count >= max_steps:
-                return
+                return True
+
+        if step_count == initial_step_count:
+            return False
 
         if response.get("done") is True:
             logger.info("Server returned done=True. Ending control loop.")
-            return
+            return True
+    return True
 
 
 def ensure_no_proxy() -> None:
@@ -550,6 +555,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Batch run UAV control in UE5 via AirSim (CV mode, no gym).")
     parser.add_argument("-r", "--log_root", required=True, help="Root dir containing log.json files")
     parser.add_argument("-o", "--images_dir", required=True, help="Directory to save outputs")
+    parser.add_argument("--require_complete", action="store_true",
+                        help="Fail if the policy stops returning usable actions during the rollout.")
     parser.add_argument("-i", "--instruction_type", default="instruction", choices=["instruction", "instruction_unified"])
     parser.add_argument("--server_ip", default=DEFAULT_SERVER_IP, help="VLA server IP")
     parser.add_argument("--server_port", type=int, default=DEFAULT_SERVER_PORT, help="VLA server port")
@@ -651,7 +658,7 @@ if __name__ == "__main__":
 
         logger.info(f"instruction: {instruction}")
         trajectory_log: List[Dict[str, Any]] = []
-        control_loop_vla(
+        completed = control_loop_vla(
             client=client,
             trajectory_log=trajectory_log,
             init_pose_world=init_world,
@@ -666,6 +673,8 @@ if __name__ == "__main__":
             frame_dir=frame_dir,
             frame_sleep=args.frame_sleep,
         )
+        if args.require_complete and not completed:
+            raise RuntimeError(f"Policy interrupted rollout for {base_name}")
 
         traj_json_path = os.path.join(out_dir, base_name + ".json")
         with open(traj_json_path, "w", encoding="utf-8") as f:
