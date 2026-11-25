@@ -230,9 +230,26 @@ Run `metric.py` only after a rollout client has finished writing trajectory outp
 
 ### 3.3 End-to-end EP evaluation
 
-From the repository root, run one CityPark question with OpenVLA and Qwen.
-Start CityPark and the policy server as in Section 3.2, activate the combined
-environment, and configure the data paths and VLM API credentials in Section 2.
+**Full evaluation.** Configure the data paths and VLM API credentials in Section 2,
+the scene executables, and the policy checkpoints (`OPENVLA_CHECKPOINT` and
+`PI0_POLICY_DIR`). From the repository root, run:
+
+```bash
+bash run_pipeline.sh
+```
+
+By default this starts the policy servers and runs Beijing and CityPark in turn.
+It selects every simulated EQA question in each scene and evaluates all six
+pairings of Qwen, GPT and Gemini with OpenVLA and OpenPi.
+
+To evaluate the **full question set with Qwen and OpenVLA only**, run:
+
+```bash
+bash run_pipeline.sh --model qwen --policy openvla
+```
+
+**Single-question check.** To reproduce one CityPark question with CityPark and
+OpenVLA already running as in Section 3.2, use the policy server's actual port:
 
 ```bash
 conda activate activefly-openvla
@@ -242,8 +259,6 @@ SKIP_CONDA=1 RUN_SIMULATOR=0 RUN_OPENVLA_SERVER=0 OPENVLA_SERVER_PORT=5008 \
 
 Set the port to the one used by your policy server. For OpenPi, activate
 `activefly-pi`, use `--policy pi`, and set `RUN_PI0_SERVER=0 PI0_SERVER_PORT=8000`.
-With service startup enabled, configure the scene executable and checkpoint
-(`OPENVLA_CHECKPOINT` or `PI0_POLICY_DIR`) before running the pipeline.
 
 For each EQA question, the planner sees the initial frame, that question's stem,
 and the trajectory's OBP action options. The selected instruction drives a fresh
