@@ -12,14 +12,15 @@ usage() {
   cat <<'EOF'
 Usage:
   ./run_pipeline.sh
-  ./run_pipeline.sh --idx 0
+  ./run_pipeline.sh --idx 76 --model qwen --policy openvla
+  ./run_pipeline.sh --stages --idx 0
   ACTIVEFLY_IDX=0 ./run_pipeline.sh
   ./run_pipeline.sh --data-id 20260217_154148
   DRY_RUN=1 ./run_pipeline.sh --idx 0
 
-run_pipeline.sh starts the selected UE simulator, OpenVLA server, Pi0 server,
-rollouts, OBP, EQA, FLUC, then eval collection. Use run_eval.sh when you only
-want to summarize existing outputs.
+The default EP workflow runs OBP on the initial view, executes its predicted
+instruction, then answers EQA on rollout frames and scores the episode.
+Use --stages for independent component evaluations and legacy output collection.
 EOF
 }
 
@@ -30,8 +31,14 @@ fi
 
 CLI_DATA_ID=""
 CLI_IDX=""
+CLI_MODEL=""
+CLI_POLICY=""
+EP_MODE=1
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    --stages) EP_MODE=0; shift ;;
+    --model) CLI_MODEL="${2:?missing VLM name}"; shift 2 ;;
+    --policy) CLI_POLICY="${2:?missing policy name}"; shift 2 ;;
     all|"")
       CLI_DATA_ID=""
       shift
@@ -53,7 +60,7 @@ while [ "$#" -gt 0 ]; do
       break
       ;;
     -*)
-      msg "unknown argument: $1"
+      echo "unknown argument: $1" >&2
       usage
       exit 2
       ;;
@@ -132,10 +139,10 @@ CONDA_SH="${CONDA_SH:-$HOME/anaconda3/etc/profile.d/conda.sh}"
 SKIP_CONDA="${SKIP_CONDA:-0}"
 
 API_ENV="${API_ENV:-api}"
-OPENVLA_SERVER_ENV="${OPENVLA_SERVER_ENV:-openvla}"
-OPENVLA_ROLLOUT_ENV="${OPENVLA_ROLLOUT_ENV:-ue_sim}"
-PI0_SERVER_ENV="${PI0_SERVER_ENV:-}"
-PI0_ROLLOUT_ENV="${PI0_ROLLOUT_ENV:-}"
+OPENVLA_SERVER_ENV="${OPENVLA_SERVER_ENV:-activefly-openvla}"
+OPENVLA_ROLLOUT_ENV="${OPENVLA_ROLLOUT_ENV:-activefly-openvla}"
+PI0_SERVER_ENV="${PI0_SERVER_ENV:-activefly-pi}"
+PI0_ROLLOUT_ENV="${PI0_ROLLOUT_ENV:-activefly-pi}"
 
 RUN_SIMULATOR="${RUN_SIMULATOR:-1}"
 RUN_OPENVLA_SERVER="${RUN_OPENVLA_SERVER:-1}"
@@ -146,6 +153,24 @@ RUN_OBP="${RUN_OBP:-1}"
 RUN_EQA="${RUN_EQA:-1}"
 RUN_FLUC="${RUN_FLUC:-1}"
 RUN_COLLECT_EVAL="${RUN_COLLECT_EVAL:-1}"
+
+# Standalone stage requests (including those from the web UI) retain their
+# original component-level inputs and outputs.
+if ! is_enabled "$RUN_OBP" || ! is_enabled "$RUN_EQA" || ! is_enabled "$RUN_FLUC" ||
+   { ! is_enabled "$RUN_OPENVLA_ROLLOUT" && ! is_enabled "$RUN_PI0_ROLLOUT"; }; then
+  EP_MODE=0
+fi
+if [[ -n "$CLI_MODEL$CLI_POLICY" && "$EP_MODE" == 0 ]]; then
+  echo "--model and --policy select complete EP runs; enable OBP, rollout, EQA and FLUC" >&2
+  exit 2
+fi
+case "$CLI_MODEL" in ""|qwen|gpt|gemini) ;; *) echo "Unknown VLM: $CLI_MODEL" >&2; exit 2 ;; esac
+case "$CLI_POLICY" in
+  openvla) RUN_PI0_ROLLOUT=0; RUN_OPENVLA_ROLLOUT=1 ;;
+  pi|openpi) RUN_OPENVLA_ROLLOUT=0; RUN_PI0_ROLLOUT=1 ;;
+  "") ;;
+  *) echo "Unknown policy: $CLI_POLICY" >&2; exit 2 ;;
+esac
 
 ACTIVEFLY_DATA_ID="${CLI_DATA_ID:-${ACTIVEFLY_DATA_ID:-}}"
 ACTIVEFLY_IDX="${CLI_IDX:-${ACTIVEFLY_IDX:-}}"
@@ -190,9 +215,9 @@ if [ -z "$SIMULATOR_XAUTHORITY" ] && [ -n "$SIMULATOR_DISPLAY" ]; then
   fi
 fi
 
-OPENVLA_SERVER_CWD="${OPENVLA_SERVER_CWD:-$ROOT/UAV-Flow-main/OpenVLA-UAV}"
-OPENVLA_SERVER_CMD="${OPENVLA_SERVER_CMD:-$PYTHON_BIN vla-scripts/run_act_server.py}"
-OPENVLA_ROLLOUT_CWD="${OPENVLA_ROLLOUT_CWD:-$ROOT/UAV-Flow-main/UAV-Flow-Eval}"
+OPENVLA_SERVER_CWD="${OPENVLA_SERVER_CWD:-$ROOT/FLUC-OpenVLA/run}"
+OPENVLA_SERVER_CMD="${OPENVLA_SERVER_CMD:-}"
+OPENVLA_ROLLOUT_CWD="${OPENVLA_ROLLOUT_CWD:-$ROOT/FLUC-OpenVLA/eval}"
 OPENVLA_ROLLOUT_ARGS="${OPENVLA_ROLLOUT_ARGS:-}"
 
 if [ -z "${PI0_SERVER_CWD:-}" ]; then
@@ -200,7 +225,7 @@ if [ -z "${PI0_SERVER_CWD:-}" ]; then
 fi
 PI0_POLICY_CONFIG="${PI0_POLICY_CONFIG:-pi05_activefly_lora}"
 PI0_POLICY_DIR="${PI0_POLICY_DIR:-$ROOT/FLUC-OpenPi/checkpoints/pi05_activefly_lora/fly_experiment/29999}"
-PI0_SERVER_CMD="${PI0_SERVER_CMD:-$UV_BIN run --no-sync scripts/serve_policy.py --port $PI0_SERVER_PORT policy:checkpoint --policy.config=$PI0_POLICY_CONFIG --policy.dir=$PI0_POLICY_DIR}"
+PI0_SERVER_CMD="${PI0_SERVER_CMD:-$PYTHON_BIN run/scripts/run_pi_server.py --policy-dir \"$PI0_POLICY_DIR\" --port $PI0_SERVER_PORT}"
 PI0_ROLLOUT_CWD="${PI0_ROLLOUT_CWD:-$ROOT/FLUC-OpenPi}"
 PI0_ROLLOUT_ARGS="${PI0_ROLLOUT_ARGS:-}"
 PI0_ROLLOUT_PYTHON="${PI0_ROLLOUT_PYTHON:-$PYTHON_BIN}"
@@ -362,6 +387,14 @@ start_openvla_server() {
     msg "[OpenVLA server] already reachable at $OPENVLA_SERVER_IP:$OPENVLA_SERVER_PORT"
     return 0
   fi
+  if [ -z "$OPENVLA_SERVER_CMD" ]; then
+    local checkpoint="${OPENVLA_CHECKPOINT:-}"
+    if [[ -z "$checkpoint" && "$DRY_RUN" != 1 ]]; then
+      echo "Set OPENVLA_CHECKPOINT or start the OpenVLA server before the pipeline" >&2
+      return 2
+    fi
+    printf -v OPENVLA_SERVER_CMD '%q ' "$PYTHON_BIN" vla-scripts/run_act_server.py --model-path "${checkpoint:-<checkpoint>}" --http-port "$OPENVLA_SERVER_PORT" --unnorm-key sim
+  fi
   start_bg "OpenVLA server" "$OPENVLA_SERVER_ENV" "$OPENVLA_SERVER_CWD" "$OPENVLA_SERVER_CMD"
   wait_port "$OPENVLA_SERVER_IP" "$OPENVLA_SERVER_PORT" "${OPENVLA_SERVER_TIMEOUT:-180}"
 }
@@ -422,13 +455,15 @@ run_pi0_rollout_root() {
   local log_root="$1"
   local images_dir="$2"
   local cmd
-  cmd="$PI0_ROLLOUT_PYTHON batch_run_pi05_all_ue5_cv_pitch.py --log_root $(shell_quote "$log_root") --images_dir $(shell_quote "$images_dir") --server_ip $(shell_quote "$PI0_SERVER_IP") --server_port $(shell_quote "$PI0_SERVER_PORT") $PI0_ROLLOUT_ARGS"
+  cmd="$PI0_ROLLOUT_PYTHON eval/run_rollout.py --log_root $(shell_quote "$log_root") --images_dir $(shell_quote "$images_dir") --server_ip $(shell_quote "$PI0_SERVER_IP") --server_port $(shell_quote "$PI0_SERVER_PORT") $PI0_ROLLOUT_ARGS"
   run_in_env "Pi0 rollout" "$PI0_ROLLOUT_ENV" "$PI0_ROLLOUT_CWD" "$cmd"
 }
 
 resolve_one_trajectory() {
   if [ -n "$ACTIVEFLY_IDX" ]; then
-    eval "$("$HOST_PYTHON_BIN" "$ROOT/utils/resolve_trajectory.py" --dataset "$ACTIVEFLY_IDX_DATASET" --idx "$ACTIVEFLY_IDX" --format shell)"
+    local resolved
+    resolved="$("$HOST_PYTHON_BIN" "$ROOT/utils/resolve_trajectory.py" --dataset "$ACTIVEFLY_IDX_DATASET" --idx "$ACTIVEFLY_IDX" --format shell)"
+    eval "$resolved"
     ACTIVEFLY_DATA_ID="$TRAJ_DATA_ID"
     ACTIVEFLY_SCENES="$TRAJ_SCENE"
     return 0
@@ -436,8 +471,43 @@ resolve_one_trajectory() {
   if [ -z "$ACTIVEFLY_DATA_ID" ]; then
     return 0
   fi
-  eval "$("$HOST_PYTHON_BIN" "$ROOT/utils/resolve_trajectory.py" --data-id "$ACTIVEFLY_DATA_ID" --format shell)"
+  local resolved
+  resolved="$("$HOST_PYTHON_BIN" "$ROOT/utils/resolve_trajectory.py" --data-id "$ACTIVEFLY_DATA_ID" --format shell)"
+  eval "$resolved"
   ACTIVEFLY_SCENES="$TRAJ_SCENE"
+}
+
+run_ep_for_scene() {
+  local scene="$1" spec model policy host port env_name python extra cmd
+  local specs="$EQA_MODELS"
+  if [ -n "$CLI_MODEL" ]; then
+    specs="$CLI_MODEL:openvla $CLI_MODEL:pi"
+  fi
+  local runs=0
+  for spec in $specs; do
+    model="${spec%%:*}"
+    policy="${spec#*:}"
+    case "$policy" in
+      openvla)
+        is_enabled "$RUN_OPENVLA_ROLLOUT" || continue
+        host="$OPENVLA_SERVER_IP"; port="$OPENVLA_SERVER_PORT"; env_name="$OPENVLA_ROLLOUT_ENV"
+        python="$PYTHON_BIN"; extra="$OPENVLA_ROLLOUT_ARGS" ;;
+      pi)
+        is_enabled "$RUN_PI0_ROLLOUT" || continue
+        host="$PI0_SERVER_IP"; port="$PI0_SERVER_PORT"; env_name="$PI0_ROLLOUT_ENV"
+        python="$PI0_ROLLOUT_PYTHON"; extra="$PI0_ROLLOUT_ARGS" ;;
+      gt|"$model") continue ;; # GT frames belong to standalone evaluation.
+      *) echo "Unknown trajectory source: $policy" >&2; return 2 ;;
+    esac
+    local args=(Air-EQA/run_ep.py --model "$model" --policy "$policy" --scene "$scene"
+                --server-ip "$host" --server-port "$port" --output-root "$EVAL_DIR/ep")
+    if [ -n "$ACTIVEFLY_DATA_ID" ]; then args+=(--data-id "$ACTIVEFLY_DATA_ID"); fi
+    if [[ -n "$ACTIVEFLY_IDX" && "$ACTIVEFLY_IDX_DATASET" == EQA ]]; then args+=(--eqa-idx "$ACTIVEFLY_IDX"); fi
+    printf -v cmd '%q ' "$python" "${args[@]}"
+    run_in_env "EP $model:$policy" "$env_name" "$ROOT" "$cmd -- $extra"
+    runs=$((runs + 1))
+  done
+  if [ "$runs" = 0 ]; then echo "No enabled model/policy pairs for EP in $scene" >&2; return 2; fi
 }
 
 run_rollouts_for_scene() {
@@ -445,8 +515,15 @@ run_rollouts_for_scene() {
   local sim_pid=""
   local line root_scene log_root openvla_images pi0_images
 
+  LAST_BG_PID=""
   start_simulator "$scene"
   sim_pid="$LAST_BG_PID"
+
+  if is_enabled "$EP_MODE"; then
+    run_ep_for_scene "$scene"
+    stop_pid "$sim_pid" "UE $scene"
+    return 0
+  fi
 
   if [ -n "$ACTIVEFLY_DATA_ID" ]; then
     if is_enabled "$RUN_OPENVLA_ROLLOUT"; then
@@ -547,6 +624,11 @@ msg "  scenes: $ACTIVEFLY_SCENES"
 msg "  eval: $EVAL_DIR"
 
 run_rollout_pipeline
+
+if is_enabled "$EP_MODE"; then
+  msg "EP results: $EVAL_DIR/ep"
+  exit 0
+fi
 
 if is_enabled "$RUN_OBP"; then
   msg "== OBP =="

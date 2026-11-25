@@ -228,35 +228,46 @@ The summary reports `nDTW`, `NE`, `SR`, and `OSR`.
 
 Run `metric.py` only after a rollout client has finished writing trajectory outputs. It is the post-rollout evaluation step for OpenVLA and OpenPi.
 
-### 3.3 Workflow Demo
+### 3.3 End-to-end EP evaluation
 
-Run the whole embodied perception test that comprise EQA -> OBP -> rollout -> EQA  pipeline. Make sure the simulated environment and the VLA server are launched. Set [API keys](#2-configuration) first.
-
-OpenVLA:
+From the repository root, run one CityPark question with OpenVLA and Qwen.
+Start CityPark and the policy server as in Section 3.2, activate the combined
+environment, and configure the data paths and VLM API credentials in Section 2.
 
 ```bash
 conda activate activefly-openvla
-
-python scripts/test_activefly_workflow.py \
-  --eqa-idx 0 \
-  --model qwen \
-  --server-ip 127.0.0.1 \
-  --server-port 5007
+SKIP_CONDA=1 RUN_SIMULATOR=0 RUN_OPENVLA_SERVER=0 OPENVLA_SERVER_PORT=5008 \
+  bash run_pipeline.sh --idx 76 --model qwen --policy openvla
 ```
 
-OpenPi:
+Set the port to the one used by your policy server. For OpenPi, activate
+`activefly-pi`, use `--policy pi`, and set `RUN_PI0_SERVER=0 PI0_SERVER_PORT=8000`.
+With service startup enabled, configure the scene executable and checkpoint
+(`OPENVLA_CHECKPOINT` or `PI0_POLICY_DIR`) before running the pipeline.
 
-```bash
-conda activate activefly-pi
+For each EQA question, the planner sees the initial frame, that question's stem,
+and the trajectory's OBP action options. The selected instruction drives a fresh
+rollout, even when several questions share a starting pose. The VLM answers the
+same EQA question using up to 16 frames from its own rollout. An incorrect action
+choice or missed reference pose still proceeds to EQA.
 
-python scripts/test_activefly_openpi_workflow.py \
-  --eqa-idx 0 \
-  --model qwen \
-  --server-ip 127.0.0.1 \
-  --server-port 8000
-```
+EP success requires a correct OBP choice, FLUC oracle success and a correct EQA
+answer. The released OBP label applies when the EQA stem matches the original
+planning question and the labelled instruction is unique. Other completed
+questions report their rollout and EQA results with null OBP and EP scores.
+Malformed action menus are recorded as invalid inputs. The summary reports
+selected, completed and scored counts; the EP rate uses the scored count.
 
-Supported VLMs: `qwen`, `gemini`, `gpt`.
+Use `--idx` for one EQA question, `--data-id` for all questions linked to one
+trajectory, or omit both for the configured simulated scenes. Without explicit
+model and policy flags, EP uses the rollout pairs in `EQA_MODELS`. Each run
+has its own directory under `eval/ep/`. Each `<data_id>/<question_id>/` directory
+holds its `result.json` and, for completed questions, its rollout. The run-level
+`summary.json` is written after processing the selected questions.
+
+Use `bash run_pipeline.sh --stages` for independent component evaluations and
+the existing result collection workflow. Standalone stage selections from the
+web UI continue to use that mode.
 
 ### 3.4 Collect Evaluation Results
 

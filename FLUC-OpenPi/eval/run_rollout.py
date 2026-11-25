@@ -327,7 +327,7 @@ def control_loop_vla(
     temporal_ensemble_decay: float,
     temporal_ensemble_window: int,
     trajectory_log: List[Dict[str, Any]],
-) -> None:
+) -> bool:
     if open_loop_horizon < 1:
         raise ValueError("open_loop_horizon must be >= 1")
     if temporal_ensemble_window < 1:
@@ -358,12 +358,12 @@ def control_loop_vla(
             )
             if response is None:
                 logger.warning("No valid response, ending control loop.")
-                break
+                return False
 
             action_chunk = validate_action_chunk(response.get("action"))
             if action_chunk is None:
                 logger.warning("Response 'action' is empty or invalid, stopping.")
-                break
+                return False
 
             action_chunk_history.append((step_count, action_chunk))
             action_chunk_history = [
@@ -400,12 +400,12 @@ def control_loop_vla(
             )
             if response is None:
                 logger.warning("No valid response for forced chunk refresh, ending control loop.")
-                break
+                return False
 
             action_chunk = validate_action_chunk(response.get("action"))
             if action_chunk is None:
                 logger.warning("Forced chunk refresh returned an invalid action chunk, stopping.")
-                break
+                return False
 
             action_chunk_history.append((step_count, action_chunk))
             action_chunk_history = [
@@ -421,7 +421,7 @@ def control_loop_vla(
             )
             if action_delta is None:
                 logger.warning("No usable action after forced chunk refresh, stopping.")
-                break
+                return False
 
         policy_local_pose = apply_action_delta(policy_local_pose, action_delta)
         pos_world, global_yaw, global_pit = local_pose_to_world_pose(
@@ -459,8 +459,9 @@ def control_loop_vla(
                 small_count = 0
             if small_count >= ACTION_SMALL_STEPS:
                 logger.info(f"Detected small change for {ACTION_SMALL_STEPS} steps, ending task.")
-                return
+                return True
         last_local_pose_world = local_pose_world
+    return True
 
 
 def ensure_no_proxy(hosts: Optional[List[str]] = None) -> None:
@@ -491,6 +492,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Batch run UAV control in UE5 via AirSim without plotting.")
     parser.add_argument("-r", "--log_root", action='append', default=None, help="Root dir containing log.json files")
     parser.add_argument("-o", "--images_dir", default=DEFAULT_IMAGES_DIR, help="Directory to save outputs")
+    parser.add_argument("--require_complete", action="store_true",
+                        help="Fail if the policy stops returning usable actions during the rollout.")
     parser.add_argument("-i", "--instruction_type", default="instruction", choices=["instruction", "instruction_unified"])
     parser.add_argument("--server_ip", default=DEFAULT_SERVER_IP, help="OpenPI policy server IP / hostname")
     parser.add_argument("--server_port", type=int, default=DEFAULT_SERVER_PORT, help="OpenPI policy server port")
@@ -612,7 +615,7 @@ if __name__ == "__main__":
 
         logger.info(f"instruction: {instruction}")
         trajectory_log: List[Dict[str, Any]] = []
-        control_loop_vla(
+        completed = control_loop_vla(
             client=client,
             trajectory_log=trajectory_log,
             init_pose_world=init_world,
@@ -630,6 +633,8 @@ if __name__ == "__main__":
             temporal_ensemble_decay=args.temporal_ensemble_decay,
             temporal_ensemble_window=args.temporal_ensemble_window,
         )
+        if args.require_complete and not completed:
+            raise RuntimeError(f"Policy interrupted rollout for {base_name}")
 
         os.makedirs(out_dir, exist_ok=True)
         with open(traj_json_path, "w", encoding="utf-8") as f:
